@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 import traceback
 import numpy as np # 用于处理可能的 NaN
+import logging
 
 # --- 配置 ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -17,6 +18,15 @@ NUM_OVERVIEW_STATIONS = 5
 
 # --- Flask 应用初始化 ---
 app = Flask(__name__)
+# --- 配置 Flask logger ---
+# 在 Render 上，日志通常会输出到标准输出，所以不需要复杂的文件配置
+app.logger.setLevel(logging.DEBUG) # 设置日志级别为 DEBUG，能看到所有信息
+handler = logging.StreamHandler() # 输出到控制台
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+if not app.logger.handlers: # 避免重复添加 handler
+    app.logger.addHandler(handler)
+# --- Logger 配置结束 ---
 
 # --- 全局变量 ---
 df_predictions = pd.DataFrame()
@@ -33,7 +43,12 @@ def load_data():
     print(f"--- [load_data] Calculated BASE_DIR: {BASE_DIR}")
     print(f"--- [load_data] Calculated DATA_FOLDER: {DATA_FOLDER}")
 
+    app.logger.info("--- [load_data] Function Start ---") # 使用 logger.info 或 logger.debug
+    app.logger.debug(f"--- [load_data] Calculated BASE_DIR: {BASE_DIR}")
+    app.logger.debug(f"--- [load_data] Calculated DATA_FOLDER: {DATA_FOLDER}")
+    
     # --- 调试：列出 data 目录内容 ---
+    app.logger.debug(f"--- [load_data] Checking contents of DATA_FOLDER ({DATA_FOLDER})...")
     print(f"--- [load_data] Checking contents of DATA_FOLDER ({DATA_FOLDER})...")
     try:
         if os.path.exists(DATA_FOLDER) and os.path.isdir(DATA_FOLDER):
@@ -147,6 +162,9 @@ def load_data():
     print(f"--- [load_data] Final check: df_predictions empty? {df_predictions.empty}")
     print(f"--- [load_data] Final check: df_truth empty? {df_truth.empty}")
     print("--- [load_data] Function End ---")
+    app.logger.info(f"--- [load_data] Final check: df_predictions empty? {df_predictions.empty}") # info 级别
+    app.logger.info(f"--- [load_data] Final check: df_truth empty? {df_truth.empty}") # info 级别
+    app.logger.info("--- [load_data] Function End ---")
 
 # --- 辅助函数：获取概览数据 ---
 def get_overview_data():
@@ -300,7 +318,7 @@ def get_daily_station_data(station_id, date_str):
 
 # --- 运行应用 ---
 if __name__ == '__main__':
-    #load_data()
+    load_data()
     if not STATION_NAMES:
         print("\n警告：未能加载任何电站名称，请检查预测 CSV 文件。\n")
     app.run(debug=False, host='0.0.0.0', port=5000)
