@@ -8,7 +8,7 @@ import numpy as np
 import logging
 import sys # 导入 sys 用于强制刷新
 
-TIME_OFFSET_HOURS = 6 # <--- 定义时间偏移量（小时）
+TIME_OFFSET_HOURS = 0 # <--- 定义时间偏移量（小时）
 # --- 配置 ---
 # 获取 app.py 文件所在的目录
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
