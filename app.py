@@ -215,106 +215,115 @@ def load_data():
 
 # --- 辅助函数：获取概览数据 ---
 def get_overview_data():
-    global df_predictions, df_truth, STATION_NAMES
+    global df_predictions, df_truth, STATION_NAMES # 确保引用全局变量
     app.logger.info("--- [get_overview_data] Function Start ---")
     overview_data = []
 
+    # 再次检查全局 DataFrame 是否为空
     if df_predictions.empty or df_truth.empty:
         app.logger.warning("--- [get_overview_data] WARNING: df_predictions or df_truth is empty. Cannot generate overview.")
-        # 返回默认结构
-        # ... (返回默认结构的代码不变) ...
+        # 返回带有占位符名称的默认结构
         overview_stations = STATION_NAMES[:NUM_OVERVIEW_STATIONS] if STATION_NAMES else [f'Placeholder_{i+1}' for i in range(NUM_OVERVIEW_STATIONS)]
         for i, station_id in enumerate(overview_stations, start=1):
-            overview_data.append({'id': station_id,'name': f"光伏电站 {i}",'actual': 'N/A','predicted': 'N/A','color': 'grey'})
+            overview_data.append({
+                'id': station_id,
+                'name': f"光伏电站 {i}", # 使用序号名称
+                'actual': 'N/A',
+                'predicted': 'N/A',
+                'color': 'grey'
+            })
         return overview_data
 
     try:
         now = datetime.now()
-        current_date = now.date() # 获取当前日期 (YYYY-MM-DD)
-        current_hm = now.strftime('%H:%M') # 获取当前时分 (HH:MM)
-        app.logger.debug(f"--- [get_overview_data] Current date: {current_date}, Current time (HH:MM): {current_hm}")
+        current_hm = now.strftime('%H:%M')
+        app.logger.debug(f"--- [get_overview_data] Current time (HH:MM): {current_hm}")
 
-        # --- 修改时间查找逻辑 ---
-        # 1. 筛选出今天的数据
+        # 查找最新的 <= current_hm 的时间点
         # 确保索引是 DatetimeIndex
         if not isinstance(df_predictions.index, pd.DatetimeIndex) or not isinstance(df_truth.index, pd.DatetimeIndex):
              app.logger.error("--- [get_overview_data] ERROR: Predictions or Truth index is not DatetimeIndex!")
              raise TypeError("DataFrame index must be DatetimeIndex for time comparison")
 
-        today_predictions = df_predictions[df_predictions.index.date == current_date]
-        today_truth = df_truth[df_truth.index.date == current_date]
-        app.logger.debug(f"--- [get_overview_data] Found {len(today_predictions)} prediction records for today.")
-        app.logger.debug(f"--- [get_overview_data] Found {len(today_truth)} truth records for today.")
+        valid_times_pred_mask = df_predictions.index.strftime('%H:%M') <= current_hm
+        valid_times_truth_mask = df_truth.index.strftime('%H:%M') <= current_hm
 
-        latest_time = pd.NaT # 初始化为 Not a Time
+        valid_times_pred = df_predictions.index[valid_times_pred_mask]
+        valid_times_truth = df_truth.index[valid_times_truth_mask]
 
-        # 2. 在今天的数据中查找 <= 当前 HH:MM 的最新时间点
-        if not today_predictions.empty and not today_truth.empty:
-            # 筛选今天数据中小于等于当前时分的时间点
-            valid_times_pred_mask = today_predictions.index.strftime('%H:%M') <= current_hm
-            valid_times_truth_mask = today_truth.index.strftime('%H:%M') <= current_hm
+        latest_time = pd.NaT
 
-            valid_times_pred = today_predictions.index[valid_times_pred_mask]
-            valid_times_truth = today_truth.index[valid_times_truth_mask]
+        if not valid_times_pred.empty and not valid_times_truth.empty:
+             latest_time_pred = valid_times_pred.max()
+             latest_time_truth = valid_times_truth.max()
+             # 使用预测时间作为基准（假设两者时间戳对齐）
+             latest_time = latest_time_pred
+             # 检查真实数据在该时间点也存在
+             if latest_time not in df_truth.index:
+                 app.logger.warning(f"--- [get_overview_data] WARNING: Latest prediction time {latest_time} not found in truth data index. Trying truth max time.")
+                 latest_time = latest_time_truth # 尝试用真实数据的最大时间
+                 if latest_time not in df_predictions.index:
+                      app.logger.error(f"--- [get_overview_data] ERROR: Latest truth time {latest_time} also not in prediction index. Cannot find common time.")
+                      latest_time = pd.NaT # 回退到 NaT
 
-            if not valid_times_pred.empty and not valid_times_truth.empty:
-                latest_time_pred = valid_times_pred.max()
-                latest_time_truth = valid_times_truth.max()
-                # 假设时间戳对齐，使用预测时间
-                latest_time = latest_time_pred
-                # 再次确认这个时间点在真实数据中也存在（以防万一）
-                if latest_time not in today_truth.index:
-                     app.logger.warning(f"--- [get_overview_data] Mismatch: Latest pred time {latest_time} not in today's truth data. Trying truth max time.")
-                     latest_time = latest_time_truth
-                     if latest_time not in today_predictions.index:
-                          app.logger.error(f"--- [get_overview_data] Mismatch: Latest truth time {latest_time} also not in today's pred data.")
-                          latest_time = pd.NaT
-                if pd.notna(latest_time):
-                     app.logger.info(f"--- [get_overview_data] Found latest matching time point for today: {latest_time}")
-            else:
-                app.logger.warning(f"--- [get_overview_data] WARNING: No valid time points <= {current_hm} found in today's predictions or truth data.")
+             if pd.notna(latest_time):
+                  app.logger.info(f"--- [get_overview_data] Found latest matching time point: {latest_time}")
+
         else:
-            app.logger.warning(f"--- [get_overview_data] WARNING: No prediction or truth data found for today ({current_date}).")
-        # --- 时间查找逻辑修改结束 ---
+             app.logger.warning(f"--- [get_overview_data] WARNING: No valid time points <= {current_hm} found in predictions or truth data.")
 
-
-        # 根据 latest_time 获取数据 (后续逻辑保持不变)
+        # 根据 latest_time 获取数据
         if pd.notna(latest_time):
-            target_stations = STATION_NAMES[:NUM_OVERVIEW_STATIONS]
+            target_stations = STATION_NAMES[:NUM_OVERVIEW_STATIONS] # 获取前 N 个站名
             app.logger.debug(f"--- [get_overview_data] Getting data for stations: {target_stations} at time {latest_time}")
+
+            # 尝试一次性获取所需行的所有列，可能更高效
             try:
-                # 使用 .loc 获取行，然后 .get 获取列值
-                actual_row = df_truth.loc[latest_time] if latest_time in df_truth.index else pd.Series(dtype=float)
-                predicted_row = df_predictions.loc[latest_time] if latest_time in df_predictions.index else pd.Series(dtype=float)
+                actual_row = df_truth.loc[[latest_time], target_stations].iloc[0]
+            except KeyError:
+                app.logger.warning(f"--- [get_overview_data] KeyError getting actual row for time {latest_time} and stations {target_stations}.")
+                actual_row = pd.Series(index=target_stations, dtype=float) # 返回空 Series
+            except IndexError: # 如果 loc 结果为空
+                 app.logger.warning(f"--- [get_overview_data] IndexError getting actual row for time {latest_time}.")
+                 actual_row = pd.Series(index=target_stations, dtype=float)
 
-                for i, station_id in enumerate(target_stations, start=1):
-                    station_name = f"光伏电站 {i}"
-                    actual_value = actual_row.get(station_id, np.nan)
-                    predicted_value = predicted_row.get(station_id, np.nan)
-                    color = 'grey'
+            try:
+                predicted_row = df_predictions.loc[[latest_time], target_stations].iloc[0]
+            except KeyError:
+                app.logger.warning(f"--- [get_overview_data] KeyError getting predicted row for time {latest_time} and stations {target_stations}.")
+                predicted_row = pd.Series(index=target_stations, dtype=float)
+            except IndexError:
+                 app.logger.warning(f"--- [get_overview_data] IndexError getting predicted row for time {latest_time}.")
+                 predicted_row = pd.Series(index=target_stations, dtype=float)
 
-                    if pd.notna(actual_value) and pd.notna(predicted_value):
-                        diff = abs(actual_value - predicted_value)
-                        if diff < 1: color = 'green'
-                        elif diff <= 2: color = 'yellow'
-                        else: color = 'red'
-                    else:
-                         app.logger.debug(f"--- [get_overview_data] Station {station_id} has NaN value at {latest_time}. Actual: {actual_value}, Predicted: {predicted_value}")
 
-                    overview_data.append({ 'id': station_id, 'name': station_name, 'actual': f"{actual_value:.2f}" if pd.notna(actual_value) else "N/A", 'predicted': f"{predicted_value:.2f}" if pd.notna(predicted_value) else "N/A", 'color': color })
-            except Exception as e:
-                 app.logger.error(f"--- [get_overview_data] Error getting data for time {latest_time}: {e}", exc_info=True)
-                 # 出错也返回默认结构
-                 overview_data = [] # 清空可能部分添加的数据
-                 overview_stations = STATION_NAMES[:NUM_OVERVIEW_STATIONS] if STATION_NAMES else [f'Placeholder_{i+1}' for i in range(NUM_OVERVIEW_STATIONS)]
-                 for i, station_id in enumerate(overview_stations, start=1):
-                     overview_data.append({'id': station_id,'name': f"光伏电站 {i}",'actual': '错误','predicted': '错误','color': 'grey'})
+            for i, station_id in enumerate(target_stations, start=1):
+                station_name = f"光伏电站 {i}"
+                actual_value = actual_row.get(station_id, np.nan) # 使用 .get 防止 KeyError
+                predicted_value = predicted_row.get(station_id, np.nan)
+                color = 'grey'
 
+                if pd.notna(actual_value) and pd.notna(predicted_value):
+                    diff = abs(actual_value - predicted_value)
+                    if diff < 1: color = 'green'
+                    elif diff <= 2: color = 'yellow'
+                    else: color = 'red'
+                else:
+                     app.logger.debug(f"--- [get_overview_data] Station {station_id} has NaN value at {latest_time}. Actual: {actual_value}, Predicted: {predicted_value}")
+
+
+                overview_data.append({
+                    'id': station_id,
+                    'name': station_name,
+                    'actual': f"{actual_value:.2f}" if pd.notna(actual_value) else "N/A",
+                    'predicted': f"{predicted_value:.2f}" if pd.notna(predicted_value) else "N/A",
+                    'color': color
+                })
         else: # 如果 latest_time 是 NaT
-             app.logger.warning("--- [get_overview_data] No valid latest_time found for today. Returning N/A data.")
+             app.logger.warning("--- [get_overview_data] No valid latest_time found. Returning N/A data.")
              overview_stations = STATION_NAMES[:NUM_OVERVIEW_STATIONS] if STATION_NAMES else [f'Placeholder_{i+1}' for i in range(NUM_OVERVIEW_STATIONS)]
              for i, station_id in enumerate(overview_stations, start=1):
-                overview_data.append({'id': station_id,'name': f"光伏电站 {i}",'actual': 'N/A','predicted': 'N/A','color': 'grey'})
+                overview_data.append({'id': station_id, 'name': f"光伏电站 {i}", 'actual': 'N/A', 'predicted': 'N/A', 'color': 'grey'})
 
     except Exception as e:
         app.logger.error(f"--- [get_overview_data] Unexpected error: {e}", exc_info=True)
@@ -322,10 +331,11 @@ def get_overview_data():
         overview_data = []
         overview_stations = STATION_NAMES[:NUM_OVERVIEW_STATIONS] if STATION_NAMES else [f'Placeholder_{i+1}' for i in range(NUM_OVERVIEW_STATIONS)]
         for i, station_id in enumerate(overview_stations, start=1):
-             overview_data.append({'id': station_id,'name': f"光伏电站 {i}",'actual': '错误','predicted': '错误','color': 'grey'})
+             overview_data.append({'id': station_id, 'name': f"光伏电站 {i}", 'actual': '错误', 'predicted': '错误', 'color': 'grey'})
 
     app.logger.info(f"--- [get_overview_data] Function End. Returning {len(overview_data)} items.")
     return overview_data
+
 
 # --- 路由定义 ---
 
