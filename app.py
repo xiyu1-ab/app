@@ -11,7 +11,7 @@ DATA_FOLDER = 'data'
 PREDICTION_FILENAME = 'final_recovered_predictions.csv'
 TRUTH_FILENAME = 'final_recovered_truth.csv' # 需要真实值文件
 GEO_INFO_FILENAME = 'station_geo_info.csv'
-TIMESTAMP_COLUMN_INDEX = 0
+TIMESTAMP_COLUMN_INDEX = 1
 NUM_OVERVIEW_STATIONS = 5 # 概览页显示的电站数量
 
 # --- Flask 应用初始化 ---
