@@ -18,31 +18,27 @@ NUM_OVERVIEW_STATIONS = 5
 
 # --- Flask 应用初始化 ---
 app = Flask(__name__)
-# --- 配置 Flask logger ---
-# 在 Render 上，日志通常会输出到标准输出，所以不需要复杂的文件配置
-app.logger.setLevel(logging.DEBUG) # 设置日志级别为 DEBUG，能看到所有信息
-handler = logging.StreamHandler() # 输出到控制台
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-if not app.logger.handlers: # 避免重复添加 handler
-    app.logger.addHandler(handler)
-# --- Logger 配置结束 ---
+app.logger.setLevel(logging.DEBUG)
+
 
 # --- 全局变量 ---
-df_predictions = pd.DataFrame()
-df_truth = pd.DataFrame()
-df_geo = pd.DataFrame()
-STATION_NAMES = []
-STATION_DISPLAY_INFO = []
-AVAILABLE_DATES = []
+#df_predictions = pd.DataFrame()
+#df_truth = pd.DataFrame()
+#df_geo = pd.DataFrame()
+#STATION_NAMES = []
+#STATION_DISPLAY_INFO = []
+#AVAILABLE_DATES = []
+
+df_predictions = pd.DataFrame() # 保持定义，但暂时不填充
+df_truth = pd.DataFrame()       # 保持定义，但暂时不填充
+df_geo = pd.DataFrame()         # 保持定义，但暂时不填充
+STATION_NAMES = ['Station_Placeholder_1', 'Station_Placeholder_2'] # 暂时给个占位符
+STATION_DISPLAY_INFO = [{'id':'placeholder', 'display':'Placeholder'}] # 占位符
+AVAILABLE_DATES = ['2024-01-01'] # 占位符
 
 # --- 数据加载函数 (加入超级详细日志) ---
 def load_data():
     global df_predictions, df_truth, df_geo, STATION_NAMES, STATION_DISPLAY_INFO, AVAILABLE_DATES
-    print("--- [load_data] Function Start ---")
-    print(f"--- [load_data] Calculated BASE_DIR: {BASE_DIR}")
-    print(f"--- [load_data] Calculated DATA_FOLDER: {DATA_FOLDER}")
-
     app.logger.info("--- [load_data] Function Start ---") # 使用 logger.info 或 logger.debug
     app.logger.debug(f"--- [load_data] Calculated BASE_DIR: {BASE_DIR}")
     app.logger.debug(f"--- [load_data] Calculated DATA_FOLDER: {DATA_FOLDER}")
