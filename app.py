@@ -261,7 +261,7 @@ def get_daily_station_data(station_id, date_str):
 
 # --- 运行应用 ---
 if __name__ == '__main__':
-    load_data()
+    #load_data()
     if not STATION_NAMES:
         print("\n警告：未能加载任何电站名称，请检查预测 CSV 文件。\n")
     app.run(debug=False, host='0.0.0.0', port=5000)
