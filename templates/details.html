@@ -1,0 +1,142 @@
+<!-- templates/details.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 标题可以动态设置，但简单起见先固定 -->
+    <title>电站详情 - 预测可视化</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 引入 tsParticles -->
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+    <!-- (可选) 引入 CSS 文件 -->
+    <!-- <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> -->
+    <style>
+        /* --- 详情页样式 (可以复用或修改之前的样式) --- */
+         body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 15px; /* 页面内边距 */
+            background-color: #e9ecef; /* 稍深的背景 */
+            color: #343a40;
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+        #tsparticles-details { /* 粒子容器 */
+            position: fixed; width: 100%; height: 100%; top: 0; left: 0; z-index: -1;
+        }
+        .container { /* 主要内容容器 */
+            max-width: 1400px; /* 详情页可以宽一点 */
+            margin: 0 auto;
+            position: relative; z-index: 1;
+        }
+        .breadcrumb { /* 面包屑导航 (可选) */
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        .breadcrumb a { color: #0056b3; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb span { margin: 0 5px; color: #6c757d; }
+
+        .controls-wrapper { text-align: center; margin-bottom: 15px; }
+        .controls { padding: 10px 15px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08); display: inline-block; }
+        .controls label { margin: 0 8px 0 12px; font-weight: 500; }
+        .controls select, .controls input[type="date"] { padding: 6px 10px; margin-right: 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9em; min-width: 150px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+        #message { text-align: center; color: #dc3545; margin-top: 8px; margin-bottom: 8px; font-weight: bold; min-height: 1.1em; font-size: 0.9em; }
+        .next-point-wrapper { text-align: center; margin-bottom: 15px; }
+        #nextPointInfo { padding: 8px 15px; background-color: #e6f7ff; border: 1px solid #91d5ff; border-radius: 5px; display: inline-block; min-width: 300px; font-size: 0.9em; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); vertical-align: middle; }
+        #nextPointInfo strong { color: #0056b3; font-weight: 600; }
+        #highlightIndicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: transparent; margin-right: 6px; vertical-align: middle; border: 1px solid transparent; }
+        .chart-container { height: 60vh; /* 图表高度可以高一些 */ width: 100%; /* 宽度占满容器 */ margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); padding: 15px; /* 图表容器内边距 */ box-sizing: border-box; /* 让 padding 不影响总宽度 */ }
+    </style>
+</head>
+<body>
+    <!-- 详情页粒子容器 -->
+    <div id="tsparticles-details"></div>
+
+    <div class="container">
+         <!-- 可选的面包屑导航 -->
+         <div class="breadcrumb">
+            <a href="{{ url_for('landing_page') }}">监控概览</a>
+            <span>></span>
+            <span id="breadcrumb-station-name">电站详情</span> <!-- JS 会更新这里 -->
+         </div>
+
+         <div class="controls-wrapper">
+            <div class="controls">
+                <label for="stationSelector">选择电站:</label>
+                <select id="stationSelector">
+                    {# 使用后端传来的 station_info 填充下拉菜单 #}
+                    {% for info in station_info %}
+                        <option value="{{ info.id }}">{{ info.display }}</option>
+                    {% else %}
+                        <option value="">无可用电站信息</option>
+                    {% endfor %}
+                </select>
+
+                <label for="dateSelector">选择日期:</label>
+                <input type="date" id="dateSelector"
+                       {% if dates %}
+                           min="{{ dates[0] }}"
+                           max="{{ dates[-1] }}"
+                       {% else %}
+                           disabled
+                       {% endif %}>
+            </div>
+         </div>
+
+        <div id="message"></div>
+
+        <div class="next-point-wrapper">
+            <div id="nextPointInfo">
+                <span id="highlightIndicator"></span>
+                下一个预测点 (<span id="nextTime" style="font-weight: bold;">--:--:--</span>):
+                <strong id="nextValue">---</strong> MW
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="predictionChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 传递选中的电站 ID 给 JS -->
+    <script>
+        const initiallySelectedStationId = "{{ selected_station_id | default('', true) | escape }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+    <script>
+         // 详情页粒子效果初始化 (可以与 landing 页不同)
+        async function loadDetailsParticles() {
+            await tsParticles.load("tsparticles-details", {
+                fpsLimit: 60,
+                particles: { /* ... 详情页的粒子配置 ... */
+                     number: { value: 80, density: { enable: true, value_area: 800 } },
+                    color: { value: "#aaaaaa" },
+                    shape: { type: "circle" },
+                    opacity: { value: 0.6, random: true, anim: { enable: true, speed: 0.8, opacity_min: 0.2 } },
+                    size: { value: 2.5, random: true },
+                    links: { enable: true, distance: 130, color: "#bbbbbb", opacity: 0.3, width: 1 },
+                    move: { enable: true, speed: 1.5, direction: "none", random: true, out_mode: "out" }
+                },
+                interactivity: {
+                    detect_on: "window",
+                    events: {
+                        onhover: { enable: true, mode: "attract" }, // 详情页用吸引效果
+                        onclick: { enable: true, mode: "push" }
+                    },
+                    modes: {
+                        attract: { distance: 150, speed: 1 },
+                        push: { particles_nb: 4 }
+                    }
+                },
+                detectRetina: true,
+                background: { color: "#e9ecef" }, // 详情页背景色
+                fullScreen: { enable: true, zIndex: -1 }
+            });
+            console.log("Details page tsParticles loaded.");
+        }
+        loadDetailsParticles().catch(error => console.error("Error loading details particles:", error));
+    </script>
+</body>
+</html>
