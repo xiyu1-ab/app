@@ -7,12 +7,16 @@ import traceback
 import numpy as np # 用于处理可能的 NaN
 
 # --- 配置 ---
-DATA_FOLDER = 'data'
+# 获取 app.py 文件所在的目录
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+# 构建 data 文件夹的绝对路径
+DATA_FOLDER = os.path.join(BASE_DIR, 'data') # 使用绝对路径
+
 PREDICTION_FILENAME = 'final_recovered_predictions.csv'
-TRUTH_FILENAME = 'final_recovered_truth.csv' # 需要真实值文件
+TRUTH_FILENAME = 'final_recovered_truth.csv'
 GEO_INFO_FILENAME = 'station_geo_info.csv'
 TIMESTAMP_COLUMN_INDEX = 0
-NUM_OVERVIEW_STATIONS = 5 # 概览页显示的电站数量
+NUM_OVERVIEW_STATIONS = 5
 
 # --- Flask 应用初始化 ---
 app = Flask(__name__)
@@ -26,23 +30,32 @@ STATION_DISPLAY_INFO = [] # 用于二级页面下拉菜单
 AVAILABLE_DATES = []
 
 # --- 数据加载函数 (修改以加载真实值) ---
+# --- 数据加载函数 (使用绝对路径) ---
 def load_data():
     global df_predictions, df_truth, df_geo, STATION_NAMES, STATION_DISPLAY_INFO, AVAILABLE_DATES
+    print(f"--- [load_data] Base directory: {BASE_DIR}") # 打印基础目录
+    print(f"--- [load_data] Data folder path: {DATA_FOLDER}") # 打印数据文件夹路径
+
     # --- 加载预测数据 ---
     try:
         prediction_filepath = os.path.join(DATA_FOLDER, PREDICTION_FILENAME)
+        print(f"--- [load_data] Attempting to load prediction file: {prediction_filepath}")
+        # 检查文件是否存在
+        if not os.path.exists(prediction_filepath):
+            print(f"错误：预测文件不存在于路径 {prediction_filepath}")
+            raise FileNotFoundError(f"Prediction file not found at {prediction_filepath}")
+
         df_predictions = pd.read_csv(prediction_filepath, index_col=TIMESTAMP_COLUMN_INDEX, parse_dates=True)
-        STATION_NAMES = df_predictions.columns.tolist() # 以预测文件的列作为基准站点列表
-        print(f"成功加载预测数据: {prediction_filepath}")
+        STATION_NAMES = df_predictions.columns.tolist()
+        print(f"成功加载预测数据. Shape: {df_predictions.shape}")
         if not df_predictions.empty:
             AVAILABLE_DATES = sorted(df_predictions.index.normalize().unique().strftime('%Y-%m-%d').tolist())
-        else:
-            AVAILABLE_DATES = []
-    except FileNotFoundError:
-        print(f"错误：无法找到预测文件 '{PREDICTION_FILENAME}'。")
+        else: AVAILABLE_DATES = []
+    except FileNotFoundError as e:
+        print(e) # 打印具体的文件未找到错误
         STATION_NAMES = []
         AVAILABLE_DATES = []
-        df_predictions = pd.DataFrame() # 确保为空
+        df_predictions = pd.DataFrame()
     except Exception as e:
         print(f"加载预测数据时出错: {e}")
         traceback.print_exc()
@@ -50,39 +63,35 @@ def load_data():
         AVAILABLE_DATES = []
         df_predictions = pd.DataFrame()
 
-    # --- 加载真实数据 ---
+    # --- 加载真实数据 (同样使用绝对路径和检查) ---
     try:
         truth_filepath = os.path.join(DATA_FOLDER, TRUTH_FILENAME)
+        print(f"--- [load_data] Attempting to load truth file: {truth_filepath}")
+        if not os.path.exists(truth_filepath):
+             print(f"错误：真实数据文件不存在于路径 {truth_filepath}")
+             raise FileNotFoundError(f"Truth file not found at {truth_filepath}")
+
         df_truth = pd.read_csv(truth_filepath, index_col=TIMESTAMP_COLUMN_INDEX, parse_dates=True)
-        print(f"成功加载真实数据: {truth_filepath}")
-        # 可选：确保真实数据的索引和列与预测数据对齐（如果需要严格比较）
-        # if not df_predictions.empty and not df_truth.empty:
-        #     common_index = df_predictions.index.intersection(df_truth.index)
-        #     common_columns = df_predictions.columns.intersection(df_truth.columns)
-        #     df_predictions = df_predictions.loc[common_index, common_columns]
-        #     df_truth = df_truth.loc[common_index, common_columns]
-        #     STATION_NAMES = df_predictions.columns.tolist() # 更新基准站点列表
-        #     print("预测和真实数据已对齐。")
-    except FileNotFoundError:
-        print(f"警告：未找到真实数据文件 '{TRUTH_FILENAME}'。概览页实际值将不可用。")
-        df_truth = pd.DataFrame() # 确保为空
+        print(f"成功加载真实数据. Shape: {df_truth.shape}")
+    except FileNotFoundError as e:
+         print(e)
+         df_truth = pd.DataFrame() # 确保为空
     except Exception as e:
         print(f"加载真实数据时出错: {e}")
         traceback.print_exc()
         df_truth = pd.DataFrame()
 
-    # --- 加载地理信息数据 (逻辑不变) ---
+    # --- 加载地理信息 (同样使用绝对路径和检查) ---
     try:
         geo_info_filepath = os.path.join(DATA_FOLDER, GEO_INFO_FILENAME)
-        df_geo = pd.read_csv(geo_info_filepath)
-        print(f"成功加载地理信息: {geo_info_filepath}")
-        required_geo_cols = ['station_id', 'longitude', 'latitude']
-        if not all(col in df_geo.columns for col in required_geo_cols):
-            print(f"警告：地理信息文件缺少必要的列 ({required_geo_cols})。")
-            df_geo = pd.DataFrame()
-    except FileNotFoundError:
-        print(f"警告：未找到地理信息文件 '{GEO_INFO_FILENAME}'。")
-        df_geo = pd.DataFrame()
+        print(f"--- [load_data] Attempting to load geo file: {geo_info_filepath}")
+        if not os.path.exists(geo_info_filepath):
+             print(f"警告：地理信息文件不存在于路径 {geo_info_filepath}")
+             df_geo = pd.DataFrame()
+        else:
+             df_geo = pd.read_csv(geo_info_filepath)
+             print(f"成功加载地理信息.")
+             # ... (后续处理 df_geo 的代码)
     except Exception as e:
         print(f"加载地理信息时出错: {e}")
         traceback.print_exc()
