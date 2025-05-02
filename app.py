@@ -8,6 +8,7 @@ import numpy as np
 import logging
 import sys # 导入 sys 用于强制刷新
 
+TIME_OFFSET_HOURS = 6 # <--- 定义时间偏移量（小时）
 # --- 配置 ---
 # 获取 app.py 文件所在的目录
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -235,9 +236,20 @@ def get_overview_data():
         return overview_data
 
     try:
-        now = datetime.now()
-        current_hm = now.strftime('%H:%M')
-        app.logger.debug(f"--- [get_overview_data] Current time (HH:MM): {current_hm}")
+        # --- 获取服务器当前时间并加上偏移量 ---
+        now_server = datetime.now() # 获取服务器当前时间 (可能是 UTC)
+        time_difference = timedelta(hours=TIME_OFFSET_HOURS) # 创建 6 小时的时间差
+        now_local_estimated = now_server + time_difference # 计算估算的本地时间
+
+        app.logger.info(f"--- [get_overview_data] Server time: {now_server.strftime('%Y-%m-%d %H:%M:%S')}")
+        app.logger.info(f"--- [get_overview_data] Applying +{TIME_OFFSET_HOURS} hours offset.")
+        app.logger.info(f"--- [get_overview_data] Estimated Local time: {now_local_estimated.strftime('%Y-%m-%d %H:%M:%S')}")
+        # --- 使用估算的本地时间进行后续操作 ---
+
+        current_hm = now_local_estimated.strftime('%H:%M')
+        current_date = now_local_estimated.date()
+        app.logger.info(f"--- [get_overview_data] Using Date for filtering: {current_date}, Using Time (HH:MM) for filtering: {current_hm}")
+        # --- 时间修正结束 ---
 
         # 查找最新的 <= current_hm 的时间点
         # 确保索引是 DatetimeIndex
