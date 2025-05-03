@@ -267,14 +267,23 @@ dateSelector.addEventListener('change', handleSelectionChange);
 // --- 页面初始化 (修改) ---
 function initializePage() {
     console.log("Initializing details page...");
-    // 1. 设置日期选择器的默认值 (逻辑不变)
-    const today = getTodayString();
-    const minDate = dateSelector.min;
-    const maxDate = dateSelector.max;
-    if (dateSelector.disabled) { console.warn("日期选择器禁用。"); }
-    else if (minDate && maxDate && today >= minDate && today <= maxDate) { dateSelector.value = today; }
-    else if (minDate) { dateSelector.value = minDate; }
-    else { console.warn("无法设置日期默认值。"); }
+    // 1. 设置日期选择器的默认值为 *最后一天*
+    const minDate = dateSelector.min; // 获取 min 属性
+    const maxDate = dateSelector.max; // 获取 max 属性 (由模板 dates[-1] 设置)
+
+    if (dateSelector.disabled) {
+        console.warn("Date selector disabled.");
+    } else if (maxDate) { // 如果 max 属性存在且有值
+        dateSelector.value = maxDate; // 将日期选择器的值设置为最后一天
+        console.log(`Date selector default set to last available date: ${maxDate}`);
+    } else if (minDate) { // 如果没有最后一天信息，但有第一天，则回退到第一天
+        dateSelector.value = minDate;
+        console.warn(`Could not determine last date, defaulting to first available date: ${minDate}`);
+    } else {
+        console.warn("Date selector has no min or max date available.");
+        // 可以尝试设置成今天，或者留空，或者显示错误
+        // dateSelector.value = getTodayString();
+    }
 
     // 2. 设置下拉菜单的初始选中项
     // initiallySelectedStationId 是从 HTML 模板中获取的
