@@ -54,6 +54,22 @@
         .indicator-yellow { background-color: #ffc107; box-shadow: 0 0 6px rgba(255, 193, 7, 0.6); }
         .indicator-red { background-color: #dc3545; box-shadow: 0 0 6px rgba(220, 53, 69, 0.6); }
         .indicator-grey { background-color: #adb5bd; box-shadow: none; }
+
+        .map-attribution {
+            position: fixed; /* 固定定位 */
+            left: 10px;      /* 距离左边 10px */
+            bottom: 10px;    /* 距离底部 10px */
+            font-size: 10px; /* 字体非常小 */
+            color: #777777;  /* 浅灰色文字，不显眼 */
+            z-index: 10;     /* 确保在粒子效果之上，但在主要内容之下（如果需要）*/
+            line-height: 1.2; /* 调整行高 */
+            background-color: rgba(255, 255, 255, 0.6); /* 可选：浅色半透明背景使其更易读 */
+            padding: 3px 5px; /* 可选：一点内边距 */
+            border-radius: 3px; /* 可选：圆角 */
+        }
+        .map-attribution p { /* 去除 p 标签默认的 margin */
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -91,6 +107,11 @@
                 {% endif %}
             </div>
         </main>
+    </div>
+
+    <div class="map-attribution">
+        <p>审图号：陕S(2024)022号</p>
+        <p>来源：国家地理信息公共服务平台</p>
     </div>
 
     <!-- 粒子效果初始化脚本 -->
